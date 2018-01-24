@@ -156,12 +156,11 @@ int main() // <ip> <us> <pass> <province_s_s>
 			//send current file //////////////////////////////////////////
 			lcd(filepath);
 			put(newfilename, sock, ip);
-			
-			printf("complete");
-			//refill
 			lcd("..");
-			RefillFile();
 			close(sock);
+			//refill
+			RefillFile();
+			printf("complete");			
 		}
 			
 		//while(1);
