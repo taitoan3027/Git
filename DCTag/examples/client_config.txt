@@ -1,0 +1,4 @@
+user,toan,
+pass,tn,
+ip,192.168.100.4,
+fname,HGi_LAMa_NUO123,

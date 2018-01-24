@@ -1,0 +1,6 @@
+server,12345,
+client,123456,
+192.168.100.4,
+cmd.txt,
+CMDResponse/,
+response.txt,

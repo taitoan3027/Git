@@ -3,9 +3,13 @@
 #include <time.h>
 #include <unistd.h>
 #include "DCTag.h"
+#include <dirent.h>
+#include <assert.h>
+
 
 #define MAX_TAG_COUNT					100
-char* LookupUnit(FILE *fptr, char* pchr_tag_name);
+void LookupUnit(char* pchr_tag_name, char* pchr_result);
+char** str_split(char* a_str, const char a_delim);
 
 int main ( int argc, char * argv[] )
 {
@@ -119,7 +123,7 @@ int main ( int argc, char * argv[] )
 	}
 
 	FILE *ptr_file;
-	FILE *ptr_unitfile;
+	
 	time_t f_time ;
 	time(&f_time);
 	struct tm *f_tm ;
@@ -127,12 +131,7 @@ int main ( int argc, char * argv[] )
 	char filename[50];
 	sprintf(filename,"%04d_%02d_%02d/temp.txt", (f_tm->tm_year)+1900, (f_tm->tm_mon)+1, f_tm->tm_mday);
 	ptr_file =fopen(filename, "w");
-	// open unit config file
-	bool b_unit_ok = 1;
-	if((ptr_unitfile = fopen("config_unit.txt", "r")) == NULL)
-	{
-		b_unit_ok = 0;
-	}
+	
 	
 	if (!ptr_file)
 		return 1;
@@ -159,15 +158,10 @@ int main ( int argc, char * argv[] )
 			tag_values[ i ].usec );
 			
 			//get unit from lookup file
-			char p_unit[5];				
-			if(b_unit_ok)
-			{
-				sprintf(p_unit, "%s", LookupUnit("", char* pchr_tag_name))
-			}
-			else
-			{
-				sprintf(p_unit, "-");
-			}
+			//memset(p_unit,0,sizeof(p_unit));			
+			char p_unit[5];
+			LookupUnit(tag_names[ i ], p_unit);
+			
 		fprintf(ptr_file,
 			"%s\t%5.6lf\t%s\t%04d%02d%02d%02d%02d%02d\t%04xH\r\n",
 			tag_names[ i ],
@@ -193,30 +187,87 @@ int main ( int argc, char * argv[] )
 	// uninitialize the SDK
 	dc_tag_uninit();
 	fclose(ptr_file);
+	
 	return 0;
 }
-char* LookupUnit(FILE *fptr, char* pchr_tag_name)
+void LookupUnit(char* pchr_tag_name, char* pchr_result)
 {
-	char row[100];
-	char pchr_result[100];
-	char c_ufound = 0;
-	while (fgets( row, sizeof( row ), fptr ) != NULL ) 
+	// open unit config file
+	FILE *ptr_unitfile;
+	if ((ptr_unitfile = fopen("unit_config.txt", "r")) != NULL)
 	{
-		char** frame_parts;
-		frame_parts = str_split(row, ',');
-		if(frame_parts)
+		char row[50];
+		char c_ufound = 0;
+
+		while (fgets( row, sizeof( row ), ptr_unitfile ) != NULL ) 
 		{
-			if(strcmp(pchr_tag_name, *(frame_parts)))
+			char** frame_parts;
+			frame_parts = str_split(row, ',');
+			if(frame_parts)
 			{
-				c_ufound = 1;
-				sprintf(pchr_result,"%s", *(frame_parts+1));
+				if(strcmp(pchr_tag_name, *(frame_parts))==0)
+				{
+					c_ufound = 1;
+					sprintf(pchr_result,"%s", *(frame_parts+1));
+				}
 			}
 		}
+		if (c_ufound == 0)
+		{
+			sprintf(pchr_result,"-");
+		}
+		fclose(ptr_unitfile);
 	}
-	if (c_ufound == 0)
+	else
 	{
-		sprintf(pchr_result,"-");
+		sprintf(pchr_result,"!!!");
 	}
-	fclose(fptr);
-	return pchr_result;
+		
+}
+char** str_split(char* a_str, const char a_delim)
+{
+    char** result    = 0;
+    size_t count     = 0;
+    char* tmp        = a_str;
+    char* last_comma = 0;
+    char delim[2];
+    delim[0] = a_delim;
+    delim[1] = 0;
+
+    /* Count how many elements will be extracted. */
+    while (*tmp)
+    {
+        if (a_delim == *tmp)
+        {
+            count++;
+            last_comma = tmp;
+        }
+        tmp++;
+    }
+
+    /* Add space for trailing token. */
+    count += last_comma < (a_str + strlen(a_str) - 1);
+
+    /* Add space for terminating null string so caller
+       knows where the list of returned strings ends. */
+    count++;
+
+    result = malloc(sizeof(char*) * count);
+
+    if (result)
+    {
+        size_t idx  = 0;
+        char* token = strtok(a_str, delim);
+
+        while (token)
+        {
+            assert(idx < count);
+            *(result + idx++) = strdup(token);
+            token = strtok(0, delim);
+        }
+        assert(idx == count - 1);
+        *(result + idx) = 0;
+    }
+
+    return result;
 }

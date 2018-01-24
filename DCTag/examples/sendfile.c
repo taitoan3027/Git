@@ -12,7 +12,8 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <time.h>
-
+#include <dirent.h>
+#include <assert.h>
 
 /*for getting file size using stat()*/
 #include <sys/stat.h>
@@ -37,7 +38,7 @@ void replylogcode(int code);
 void send226_transfer_complete(int socket);
 void service_freeArgs(char* *ap_argv, const int a_argc);
 char** service_parseArgs(const char* a_cmdStr, int *ap_argc);
-void session_create(int sock, char * ip, char * user, char * pass);
+char session_create(int sock, char * ip, char * user, char * pass);
 //void session_create(int sock, char * ip);
 void pwd(const int sock);
 void lpwd();
@@ -54,106 +55,122 @@ void ls_non_path(char* file,const int sd, char * ip);
 void ls_path(char* file,const int sd, char * ip);
 void  rm_non_empty_dir(char* file,const int sd, char * ip);
 void get(char *file, const int sd,char * ip);
-void put(char *file, const int sd,char * ip);
+char put(char *file, const int sd,char * ip);
 void service_handleCmd(const int socket, char**ap_argv, const int a_argc, char * ip);
 void service_create(int socket, char* ip);
-
+char ReadConfig(char* ip, char* username, char* password, char* filename);
+char** str_split(char* a_str, const char a_delim);
+void InsertWaitingList(char* fpath, char* fname);
+void RefillFile();
 
 /////////////// main ///////////////////////////////
-
-int main(int argc,char *argv[]) // <ip> <us> <pass> <province_s_s>
+char ip[30];
+char username[30];
+char password[30];
+char filename[30];
+	
+int main() // <ip> <us> <pass> <province_s_s>
 {
 	//rename newest file
 
 	
-	if(argc < 5)
+	if(ReadConfig(ip, username, password, filename ))
 	{
-		printf("Usage: %s <ip address>\n",argv[0]);
-		exit(1);
-	}
-	time_t rawtime;
-	time ( &rawtime );
-    struct tm *info;
+		time_t rawtime;
+		time ( &rawtime );
+		struct tm *info;
 
-    info = localtime( &rawtime );
-	char newfilename[100];
-	char newfilepath[100];
-	char oldfilepath[100];
-	char filepath[50];
-	sprintf(filepath,"%04d_%02d_%02d/", (info->tm_year)+1900, (info->tm_mon)+1, info->tm_mday);
-	
-	sprintf(oldfilepath,"%stemp.txt",filepath);
-	sprintf(newfilename,"%s_%04d%02d%02d%02d%02d%02d.txt",argv[4],(info->tm_year) + 1900, (info->tm_mon) + 1,info->tm_mday,info->tm_hour,info->tm_min,info->tm_sec);
-	sprintf(newfilepath,"%s%s",filepath, newfilename);
-	
-	if(rename(oldfilepath, newfilepath) == 0)
-	{
-		printf("%s has been rename %s.\n", oldfilepath, newfilepath);
+		info = localtime( &rawtime );
+		char newfilename[100];
+		char newfilepath[100];
+		char oldfilepath[100];
+		char filepath[50];
+		sprintf(filepath,"%04d_%02d_%02d/", (info->tm_year)+1900, (info->tm_mon)+1, info->tm_mday);
+		
+		sprintf(oldfilepath,"%stemp.txt",filepath);
+		sprintf(newfilename,"%s_%04d%02d%02d%02d%02d%02d.txt",filename,(info->tm_year) + 1900, (info->tm_mon) + 1,info->tm_mday,info->tm_hour,info->tm_min,info->tm_sec);
+		sprintf(newfilepath,"%s%s",filepath, newfilename);
+		
+		if(rename(oldfilepath, newfilepath) == 0)
+		{
+			printf("%s has been rename %s.\n", oldfilepath, newfilepath);
+		}
+		else
+		{
+			fprintf(stderr, "Error renaming %s.\n", oldfilepath);
+			return 0;
+		}
+		
+
+
+		printf("Connecting...\n");
+		struct sockaddr_in *remote;
+		struct stat obj;
+		int sock;
+		int  tmpres;
+		//create socket va connect to server ftp ///////////////////////////
+		
+		sock = socket(AF_INET, SOCK_STREAM, 0);
+		if(sock == -1)
+		{
+			printf("socket creation failed");
+			InsertWaitingList(filepath, newfilename);
+			exit(1);
+		}
+
+		
+		remote = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in *));
+		remote->sin_family = AF_INET;
+		
+		tmpres = inet_pton(AF_INET, ip, (void *)(&(remote->sin_addr.s_addr)));
+		if( tmpres < 0)  
+		{
+			perror("Can't set remote->sin_addr.s_addr\n");
+			InsertWaitingList(filepath, newfilename);
+			exit(1);
+		}else if(tmpres == 0)
+		{
+			fprintf(stderr, "%s is not a valid IP address\n", ip);
+			InsertWaitingList(filepath, newfilename);
+			exit(1);
+		}
+		remote->sin_port = htons(PORT);
+		
+		tmpres = connect(sock,(struct sockaddr*)remote, sizeof(struct sockaddr));
+		if(tmpres == -1)
+		{
+			printf("Connect Error\n");
+			InsertWaitingList(filepath, newfilename);
+			exit(1);
+		}
+		printf("connect ok");
+		// create session user , password /////////////////////
+
+		if(!session_create(sock, ip, username, password))
+		{
+			InsertWaitingList(filepath, newfilename);
+			exit(1);
+		}
+		else
+		{
+			//send current file //////////////////////////////////////////
+			lcd(filepath);
+			put(newfilename, sock, ip);
+			
+			printf("complete");
+			//refill
+			lcd("..");
+			RefillFile();
+			close(sock);
+		}
+			
+		//while(1);
+		return 0;
 	}
 	else
 	{
-		fprintf(stderr, "Error renaming %s.\n", oldfilepath);
-		return 0;
+		
 	}
-	
-
-
-	printf("Connecting...\n");
-	struct sockaddr_in *remote;
-	struct stat obj;
-	int sock;
-	int  tmpres;
-	//create socket va connect to server ftp ///////////////////////////
-	
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if(sock == -1)
-	{
-		printf("socket creation failed");
-		exit(1);
-	}
-
-	char *ip = argv[1];
-	remote = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in *));
-	remote->sin_family = AF_INET;
-	printf("Connecting 1\n");
-
-	tmpres = inet_pton(AF_INET, ip, (void *)(&(remote->sin_addr.s_addr)));
-	if( tmpres < 0)  
-	{
-		perror("Can't set remote->sin_addr.s_addr\n");
-		exit(1);
-	}else if(tmpres == 0)
-	{
-		fprintf(stderr, "%s is not a valid IP address\n", ip);
-		exit(1);
-	}
-	remote->sin_port = htons(PORT);
-	printf("Connecting 2\n");
-
-	tmpres = connect(sock,(struct sockaddr*)remote, sizeof(struct sockaddr));
-	if(tmpres == -1)
-	{
-		printf("Connect Error\n");
-		exit(1);
-	}
-	printf("connect ok");
-	// create session user , password /////////////////////
-
-	session_create(sock, ip, argv[2], argv[3]);
-
-	
-	
-
-
-
-	//  send file //////////////////////////////////////////
-	lcd(filepath);
-	put(newfilename, sock, ip);
-	close(sock);
-	printf("complete");
-	//while(1);
-	return 0;
-
 }
 
 void replylogcode(int code)
@@ -282,7 +299,7 @@ char** service_parseArgs(const char* a_cmdStr, int *ap_argc)
 
 
 
-void session_create(int sock, char * ip, char * user, char * pass)
+char session_create(int sock, char * ip, char * user, char * pass)
 {
 	/*
 	Connection Establishment
@@ -318,8 +335,8 @@ void session_create(int sock, char * ip, char * user, char * pass)
 				{
 					replylogcode(codeftp);
 					printf("Not 220...\n");
-
-					exit(1);
+					return 0;
+					//exit(1);
 				}
 				printf("220...\n");
 				//str = strstr(buf, "220 \r\n");
@@ -347,7 +364,8 @@ void session_create(int sock, char * ip, char * user, char * pass)
 			if(codeftp != 331)
 			{
 				replylogcode(codeftp);
-				exit(1);
+				return 0;
+				//exit(1);
 			}
 			printf("%s", buf);
 
@@ -368,7 +386,8 @@ void session_create(int sock, char * ip, char * user, char * pass)
 			if(codeftp != 230)
 			{
 				replylogcode(codeftp);
-				exit(1);
+				return 0;
+				//exit(1);
 			}
 			printf("%s", buf);
 
@@ -384,7 +403,8 @@ void session_create(int sock, char * ip, char * user, char * pass)
 			{
 				replylogcode(codeftp);
 				printf("Not 215...\n");
-				exit(1);
+				return 0;
+				//exit(1);
 			}
 			printf("%s", buf);
 			//str = strstr(buf, "220 \r\n");
@@ -395,7 +415,7 @@ void session_create(int sock, char * ip, char * user, char * pass)
 			}
 			memset(buf, 0, sizeof buf);
 		 }
-
+	return 1;
 }
 
 void pwd(const int sock)
@@ -1202,11 +1222,8 @@ void get(char *file, const int sd,char * ip)
 
 }
 
-void put(char *file, const int sd,char * ip)
-{
-
-
-	
+char put(char *file, const int sd,char * ip)
+{	
 	char stor[N];
 
 	char buff[N];
@@ -1223,14 +1240,15 @@ void put(char *file, const int sd,char * ip)
 	if( 0 > (fd = open(file, O_RDONLY)) ){
 
 		perror("open");
-		return;
+		return 2;
 	}
 
 	//RETR 
 	if( send(sd, stor, strlen(stor), 0) < 0 ){
 
 		perror("send");
-		exit(2);
+		return 0;
+		//exit(2);
 
 	}
 	
@@ -1238,7 +1256,8 @@ void put(char *file, const int sd,char * ip)
 	if( recv(sd, buff, sizeof(buff), 0 ) < 0){
 
 		perror("recv");
-		exit(5);
+		return 0;
+		// exit(5);
 	}
 	else printf("%s",buff);
 
@@ -1251,24 +1270,16 @@ void put(char *file, const int sd,char * ip)
 		if( 0 > send(sockfd, buff, len, 0) ){
 
 			perror("send");
-			exit(1);
+			return 0;
+			// exit(1);
 		}
 	}
-
-
-
-
 	close(sockfd); //Dong socket
-
-
+	return 1;
 }
 
 void service_handleCmd(const int socket, char**ap_argv, const int a_argc, char * ip)
 {
-
-
-	
-
 
 	///////////  pwd   ///////////////////////
 	if(strcmp(ap_argv[0], "lpwd") == 0)
@@ -1462,4 +1473,204 @@ void service_create(int socket, char* ip)
 
 }
 
+char ReadConfig(char* ip, char* username, char* password, char* filename)
+{
+	char row[100];
+    FILE *fptr; // pointer to received file
+	
+    if ((fptr = fopen("client_config.txt", "r")) == NULL)
+    {
+        printf("Error! Config file not found");
+		return 0;
+        //// Program exits if file pointer returns NULL.                 
+    }
+	else
+	{
+		printf("opened config succesfully \r\n");
+		//// reads server 8021 user/pass
+		while (fgets( row, sizeof( row ), fptr ) != NULL ) 
+		{ 
+			char** frame_parts;
+			frame_parts = str_split(row, ',');
+			if(frame_parts)
+			{					
+				if (strcmp(*(frame_parts),"user") == 0)
+				{
+					printf("setting server's username...");
+					
+					sprintf(username,"%s", *(frame_parts + 1));
+					printf("Server username: %s___", username);
+					printf("Done\r\n");
+				}
+				else if (strcmp(*(frame_parts),"pass") == 0)
+				{
+					printf("setting server's password...");
+					sprintf(password,"%s", *(frame_parts + 1));
+					printf("Server password: %s___", password);
+					printf("Done\r\n");
+				}
+				else if (strcmp(*(frame_parts),"ip") == 0)
+				{
+					printf("setting server ip address...");
+					sprintf(ip,"%s", *(frame_parts + 1));
+					printf("Server IP address: %s___", ip);
+					printf("Done\r\n");
+				}
+				else if (strcmp(*(frame_parts),"fname") == 0)
+				{
+					printf("setting valid name for command file...");
+					sprintf(filename,"%s", *(frame_parts + 1));
+					printf("Name: %s___", filename);
+					printf("Done\r\n");
+				}
+				
+				free(frame_parts);
+			}
+		}
+		
+		fclose(fptr);
+		printf("Configuration completed!");
+		return  1;
+	}
+}
+char** str_split(char* a_str, const char a_delim)
+{
+    char** result    = 0;
+    size_t count     = 0;
+    char* tmp        = a_str;
+    char* last_comma = 0;
+    char delim[2];
+    delim[0] = a_delim;
+    delim[1] = 0;
 
+    /* Count how many elements will be extracted. */
+    while (*tmp)
+    {
+        if (a_delim == *tmp)
+        {
+            count++;
+            last_comma = tmp;
+        }
+        tmp++;
+    }
+
+    /* Add space for trailing token. */
+    count += last_comma < (a_str + strlen(a_str) - 1);
+
+    /* Add space for terminating null string so caller
+       knows where the list of returned strings ends. */
+    count++;
+
+    result = malloc(sizeof(char*) * count);
+
+    if (result)
+    {
+        size_t idx  = 0;
+        char* token = strtok(a_str, delim);
+
+        while (token)
+        {
+            assert(idx < count);
+            *(result + idx++) = strdup(token);
+            token = strtok(0, delim);
+        }
+        assert(idx == count - 1);
+        *(result + idx) = 0;
+    }
+
+    return result;
+}
+//read waiting_list and refill ip connect eshtablished succesfully
+void RefillFile()
+{
+	char row[100];
+    FILE *fptr; // pointer to received file
+	FILE *tmp_ptr;
+	
+    if ((fptr = fopen("waiting_list.txt", "r+")) == NULL)
+    {
+        printf("Error! waiting_list not found");
+		return 0;
+        //// Program exits if file pointer returns NULL.                 
+    }
+	tmp_ptr = fopen("temp_wlist.txt", "w"); //save exits file name and filepath after refill
+	
+	
+		printf("opened \"waiting_list.txt\" succesfully \r\n");
+		//// reads server 8021 user/pass
+		while (fgets( row, sizeof( row ), fptr ) != NULL ) 
+		{ 
+			printf("Sending file %s ...", row);
+			char** frame_parts;
+			frame_parts = str_split(row, ',');
+			if(frame_parts)
+			{	
+				struct sockaddr_in *remote;
+				struct stat obj;
+				int sock;
+				int  tmpres;
+				sock = socket(AF_INET, SOCK_STREAM, 0);
+				if(sock != -1)
+				{
+					remote = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in *));
+					remote->sin_family = AF_INET;
+					tmpres = inet_pton(AF_INET, ip, (void *)(&(remote->sin_addr.s_addr)));
+					if( tmpres > 0)  
+					{
+						remote->sin_port = htons(PORT);
+						tmpres = connect(sock,(struct sockaddr*)remote, sizeof(struct sockaddr));
+						if(tmpres != -1)
+						{
+							if(session_create(sock, ip, username, password))
+							{
+								lcd(*(frame_parts));
+								char c_put_result = 0;
+								if((c_put_result=put(*(frame_parts+1), sock, ip)) == 1)
+								{
+									close(sock);
+								}
+								else if(c_put_result == 0) // == 2 as not found file, so not add to waiting list again	
+								{
+									fprintf(tmp_ptr, "%s,%s,\r\n",*(frame_parts),*(frame_parts+1));
+								}	
+								lcd("..");
+								free(frame_parts);								
+							}
+							else	
+							{
+								fprintf(tmp_ptr, "%s,%s,\r\n",*(frame_parts),*(frame_parts+1));
+							}	
+						}
+						else	
+						{
+							fprintf(tmp_ptr, "%s,%s,\r\n",*(frame_parts),*(frame_parts+1));
+						}	
+					}
+					else	
+					{
+						fprintf(tmp_ptr, "%s,%s,\r\n",*(frame_parts),*(frame_parts+1));
+					}	
+				}
+				else	
+				{
+					fprintf(tmp_ptr, "%s,%s,\r\n",*(frame_parts),*(frame_parts+1));
+				}					
+			}	
+		}
+		fclose(fptr);
+		fclose(tmp_ptr);
+		remove("waiting_list.txt");
+		rename("temp_wlist.txt", "waiting_list.txt");
+		//printf("Refill completed!");
+		return  1;
+	
+}
+void InsertWaitingList(char* fpath, char* fname)
+{
+	char row[100];
+    FILE *fptr; // pointer to received file
+	
+    fptr = fopen("waiting_list.txt", "a");
+    fprintf(fptr, "%s,%s,\r\n",fpath,fname);
+	printf("Add to \"wating_list.txt\"");
+}
