@@ -1,0 +1,9 @@
+D:\MyProject\ADAMConfig\ADAMConfig\bin\Debug\ADAMConfig.exe.config
+D:\MyProject\ADAMConfig\ADAMConfig\bin\Debug\ADAMConfig.exe
+D:\MyProject\ADAMConfig\ADAMConfig\bin\Debug\ADAMConfig.pdb
+D:\MyProject\ADAMConfig\ADAMConfig\obj\Debug\ADAMConfig.csprojResolveAssemblyReference.cache
+D:\MyProject\ADAMConfig\ADAMConfig\obj\Debug\ADAMConfig.Form1.resources
+D:\MyProject\ADAMConfig\ADAMConfig\obj\Debug\ADAMConfig.Properties.Resources.resources
+D:\MyProject\ADAMConfig\ADAMConfig\obj\Debug\ADAMConfig.csproj.GenerateResource.Cache
+D:\MyProject\ADAMConfig\ADAMConfig\obj\Debug\ADAMConfig.exe
+D:\MyProject\ADAMConfig\ADAMConfig\obj\Debug\ADAMConfig.pdb
