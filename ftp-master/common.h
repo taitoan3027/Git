@@ -88,9 +88,9 @@ static const char *cmdlist_str[] =
   "PORT", "PWD", "QUIT", "RETR", "RMD", "RNFR", "RNTO", "SITE", "SIZE",
   "STOR", "TYPE", "USER", "NOOP" 
 };
-volatile char res_filepath[20];
-volatile char cmd_filename[20];
-volatile char response_filename[20];
+volatile char res_filepath[50];
+volatile char cmd_filename[50];
+volatile char response_filename[50];
 /* Valid usernames for anonymous ftp */
 static const char *usernames[] = 
 {

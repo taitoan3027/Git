@@ -568,8 +568,8 @@ void HanldeFile(State *state)
     info = localtime( &rawtime );
 	char res_filename[100];
 	char cmd_newFilename[100];
-	sprintf(res_filename,"%04d%02d%02d%02d%02d%02d_response.txt",(info->tm_year) + 1900, (info->tm_mon) + 1,info->tm_mday,info->tm_hour,info->tm_min,info->tm_sec);
-	sprintf(cmd_newFilename,"%04d%02d%02d%02d%02d%02d_cmd.txt",(info->tm_year) + 1900, (info->tm_mon) + 1,info->tm_mday,info->tm_hour,info->tm_min,info->tm_sec);
+	sprintf(res_filename,"%04d%02d%02d%02d%02d%02d_%s",(info->tm_year) + 1900, (info->tm_mon) + 1,info->tm_mday,info->tm_hour,info->tm_min,info->tm_sec, response_filename);
+	sprintf(cmd_newFilename,"%04d%02d%02d%02d%02d%02d_%s",(info->tm_year) + 1900, (info->tm_mon) + 1,info->tm_mday,info->tm_hour,info->tm_min,info->tm_sec, cmd_filename);
 	time_t nowtime;
 	time(&nowtime);
 	//delay 2s
@@ -579,14 +579,14 @@ void HanldeFile(State *state)
 	}
 	if ((w_fptr = fopen(res_filename, "w")) == NULL)
     {
-        printf("Error! opening response file");
+        printf("Error! creating response file");
 		
         // Program exits if file pointer returns NULL.
         exit(1);         
     }
     if ((r_fptr = fopen(cmd_filename, "r")) == NULL)
     {
-        printf("Error! opening cmd file");
+        printf("Error! invalid cmd file name");
 		fprintf(w_fptr,"Error! opening cmd file / invalid name");
         // Program exits if file pointer returns NULL.
         //exit(1);         
@@ -606,10 +606,31 @@ void HanldeFile(State *state)
 					// printf("%s___", *(frame_parts + i));
 					// free(*(frame_parts + i));
 				// }
-				Handle_CMD(frame_parts,w_fptr);
-				printf("\n");
-				
-				
+				if(strcmp(*(frame_parts), "user") == 0)
+				{
+					printf("Remote Server Username: %s", *(frame_parts+1));
+					sprintf(server_username,"%s", *(frame_parts+1));
+				}
+				else if(strcmp(*(frame_parts), "pass") == 0)
+				{
+					printf("Remote Server password: %s", *(frame_parts+1));
+					sprintf(server_password,"%s", *(frame_parts+1));
+				}
+				else if(strcmp(*(frame_parts), "ip") == 0)
+				{
+					printf("Remote Server Ip Address: %s", *(frame_parts+1));
+					sprintf(server_ip,"%s", *(frame_parts+1));
+				}
+				else if(strcmp(*(frame_parts), "path") == 0)
+				{
+					printf("Remote Save Folder: %s", *(frame_parts+1));
+					sprintf(res_filepath,"%s", *(frame_parts+1));
+				}
+				else
+				{
+					Handle_CMD(frame_parts,w_fptr);
+				}
+				printf("\n");				
 				free(frame_parts);
 			}
 		}
@@ -775,7 +796,7 @@ void WriteTag(char* tagname, char* value, FILE * fptr)
 	rc = dc_tag_init( 1, NULL, NULL );
 	if ( rc != 0 )
 	{
-		sprintf( ret_str, "dc_tag_init failed! error = %d\n", rc );
+		sprintf( ret_str, "dc_tag_init failed! error = %d\r\n", rc );
 		fprintf(fptr, ret_str);
 		printf( ret_str);
 		return 0;

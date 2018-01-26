@@ -217,85 +217,70 @@ void my_wait(int signum)
   wait(&status);
 }
 
-void ReadConfig(void)
+char ReadConfig(void)
 {
 	char row[1000];
     FILE *fptr; // pointer to received file
 	
-    if ((fptr = fopen("cmdconfig.txt", "r")) == NULL)
+    if ((fptr = fopen("server_config.txt", "r")) == NULL)
     {
-        printf("Error! opening response file");
+        printf("Error! opening file \"server_config.txt\"");
         //// Program exits if file pointer returns NULL.
-        exit(1);         
+        return 0;    
     }
-	printf("opened config ok \r\n");
-    //// reads server 8021 user/pass
-    while (fgets( row, sizeof( row ), fptr ) != NULL ) 
-	{ 
-		char** frame_parts;
-		frame_parts = str_split(row, ',');
-		if(frame_parts)
-		{					
-			if (strcmp(*(frame_parts),"serverup") == 0)
-			{
-				printf("setting server username/password...");
+	else
+	{
+		printf("opened file \"server_config.txt\ successfully \r\n");
+		//// reads server 8021 user/pass
+		while (fgets( row, sizeof( row ), fptr ) != NULL ) 
+		{ 
+			char** frame_parts;
+			frame_parts = str_split(row, ',');
+			if(frame_parts)
+			{					
+				if (strcmp(*(frame_parts),"user") == 0)
+				{
+					printf("setting server username...");
+					
+					sprintf(client_user_name,"%s", *(frame_parts + 1));
+					printf("Server username: %s___", client_user_name);
+					
+					printf("Done\r\n");
+				}
+				else if (strcmp(*(frame_parts),"pass") == 0)
+				{
+					printf("setting server password...");
+					sprintf(client_pass_word,"%s", *(frame_parts + 1));
+					printf("Server password: %s___", client_pass_word);
+					
+					printf("Done\r\n");
+				}
+				else if (strcmp(*(frame_parts),"fname") == 0)
+				{
+					printf("setting valid name for command file...");
+					sprintf(cmd_filename,"%s_cmd.txt", *(frame_parts + 1));
+					printf("valid CMD file name: %s___", cmd_filename);
+					printf("setting valid name for response file...");
+					sprintf(response_filename,"%s_response.txt", *(frame_parts + 1));
+					printf("valid Response file name: %s___", response_filename);
+					printf("Done\r\n");
+				}
 				
-				sprintf(client_user_name,"%s", *(frame_parts + 1));
-				sprintf(client_pass_word,"%s", *(frame_parts + 2));
-				printf("Server username: %s___", client_user_name);
-				printf("Server password: %s___", client_pass_word);
-				printf("Done\r\n");
+				free(frame_parts);
 			}
-			else if (strcmp(*(frame_parts),"clientup") == 0)
-			{
-				printf("setting client username/password...");
-				sprintf(server_username,"%s", *(frame_parts + 1));
-				sprintf(server_password,"%s", *(frame_parts + 2));
-				printf("Client username: %s___", server_username);
-				printf("Client password: %s___", server_password);
-				printf("Done\r\n");
-			}
-			else if (strcmp(*(frame_parts),"clientip") == 0)
-			{
-				printf("setting client ip address...");
-				sprintf(server_ip,"%s", *(frame_parts + 1));
-				printf("Server IP address: %s___", server_ip);
-				printf("Done\r\n");
-			}
-			else if (strcmp(*(frame_parts),"cmdfn") == 0)
-			{
-				printf("setting valid name for command file...");
-				sprintf(cmd_filename,"%s", *(frame_parts + 1));
-				printf("Name: %s___", cmd_filename);
-				printf("Done\r\n");
-			}
-			else if (strcmp(*(frame_parts),"resp") == 0)
-			{
-				printf("setting valid path for response file...");
-				sprintf(res_filepath,"%s", *(frame_parts + 1));
-				printf("Name: %s___", res_filepath);
-				printf("Done\r\n");
-			}
-			else //if (strcmp(*(frame_parts),"resfn") == 0)
-			{
-				// printf("setting valid name for response file...");
-				// sprintf(response_filename,"%s", *(frame_parts + 1));
-				// printf("Done\r\n");
-			}
-			free(frame_parts);
 		}
+		
+		fclose(fptr);
+		printf("Configuration completed!");
+		return 1;
 	}
-	
-    fclose(fptr);
-    printf("Configuration completed!");
 }
 
 
 int main ( int argc, char * argv[] )
 {
-  ReadConfig();
-  
-  server(8021);
+  if(ReadConfig())
+    server(8021);
   //WriteTag("BoardIO:digital_out_0", "0.0");
 
 	
