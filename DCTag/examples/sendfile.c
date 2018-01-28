@@ -154,8 +154,10 @@ int main() // <ip> <us> <pass> <province_s_s>
 		else
 		{
 			//send current file //////////////////////////////////////////
+			cd(filename, sock);
 			lcd(filepath);
 			put(newfilename, sock, ip);
+			
 			lcd("..");
 			close(sock);
 			//refill
