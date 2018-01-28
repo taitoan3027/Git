@@ -1624,6 +1624,7 @@ void RefillFile()
 						{
 							if(session_create(sock, ip, username, password))
 							{
+								cd(filename, sock);
 								lcd(*(frame_parts));
 								char c_put_result = 0;
 								if((c_put_result=put(*(frame_parts+1), sock, ip)) == 1)
